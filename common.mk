@@ -4,20 +4,24 @@
 
 SHELL := bash
 BASH ?= bash
-ROOT ?= $(shell pwd)/..
+ROOT = $(shell pwd)/..
 
-BUILD_PATH			?= $(ROOT)/build
-LINUX_PATH			?= $(ROOT)/linux
-OPTEE_GENDRV_MODULE		?= $(LINUX_PATH)/drivers/tee/optee/optee.ko
-GEN_ROOTFS_PATH			?= $(ROOT)/gen_rootfs
-GEN_ROOTFS_FILELIST		?= $(GEN_ROOTFS_PATH)/filelist-tee.txt
-OPTEE_OS_PATH			?= $(ROOT)/optee_os
-OPTEE_CLIENT_PATH		?= $(ROOT)/optee_client
-OPTEE_CLIENT_EXPORT		?= $(OPTEE_CLIENT_PATH)/out/export
-OPTEE_TEST_PATH			?= $(ROOT)/optee_test
-OPTEE_TEST_OUT_PATH		?= $(ROOT)/optee_test/out
-HELLOWORLD_PATH			?= $(ROOT)/hello_world
-BENCHMARK_APP_PATH		?= $(ROOT)/optee_benchmark
+BUILD_PATH				= $(ROOT)/build
+LINUX_PATH				= $(ROOT)/linux
+OPTEE_GENDRV_MODULE		= $(LINUX_PATH)/drivers/tee/optee/optee.ko
+GEN_ROOTFS_PATH			= $(ROOT)/gen_rootfs
+GEN_ROOTFS_FILELIST		= $(GEN_ROOTFS_PATH)/filelist-tee.txt
+OPTEE_OS_PATH			= $(ROOT)/optee_os
+OPTEE_CLIENT_PATH		= $(ROOT)/optee_client
+OPTEE_CLIENT_EXPORT		= $(OPTEE_CLIENT_PATH)/out/export
+OPTEE_TEST_PATH			= $(ROOT)/optee_test
+OPTEE_TEST_OUT_PATH		= $(ROOT)/optee_test/out
+HELLOWORLD_PATH			= $(ROOT)/hello_world
+OPTEE_APP_PATH			= $(ROOT)/optee_app
+BENCHMARK_APP_PATH		= $(ROOT)/optee_benchmark
+
+# If building on Hikey
+#HIKEY					= y
 
 # default high verbosity. slow uarts shall specify lower if prefered
 CFG_TEE_CORE_LOG_LEVEL		?= 3
@@ -75,7 +79,7 @@ endif
 
 ifneq ($(COMPILE_S_KERNEL),)
 OPTEE_OS_COMMON_EXTRA_FLAGS ?= O=out/arm
-OPTEE_OS_BIN		    ?= $(OPTEE_OS_PATH)/out/arm/core/tee.bin
+OPTEE_OS_BIN		    = $(OPTEE_OS_PATH)/out/arm/core/tee.bin
 ifeq ($(COMPILE_S_USER),)
 $(error COMPILE_S_USER must be defined as COMPILE_S_KERNEL=$(COMPILE_S_KERNEL) is defined)
 endif
@@ -100,10 +104,10 @@ CROSS_COMPILE_S_USER    ?= "$(CCACHE)$(AARCH$(COMPILE_S_USER)_CROSS_COMPILE)"
 CROSS_COMPILE_S_KERNEL  ?= "$(CCACHE)$(AARCH$(COMPILE_S_KERNEL)_CROSS_COMPILE)"
 
 ifeq ($(COMPILE_S_USER),32)
-OPTEE_OS_TA_DEV_KIT_DIR	?= $(OPTEE_OS_PATH)/out/arm/export-ta_arm32
+OPTEE_OS_TA_DEV_KIT_DIR	= $(OPTEE_OS_PATH)/out/arm/export-ta_arm32
 endif
 ifeq ($(COMPILE_S_USER),64)
-OPTEE_OS_TA_DEV_KIT_DIR	?= $(OPTEE_OS_PATH)/out/arm/export-ta_arm64
+OPTEE_OS_TA_DEV_KIT_DIR	= $(OPTEE_OS_PATH)/out/arm/export-ta_arm64
 endif
 
 ifeq ($(COMPILE_S_KERNEL),64)
@@ -154,6 +158,10 @@ LINUX_DEFCONFIG_BENCH ?= $(CURDIR)/kconfigs/tee_bench.conf
 endif
 
 LINUX_COMMON_FLAGS ?= LOCALVERSION= CROSS_COMPILE=$(CROSS_COMPILE_NS_KERNEL)
+
+ifdef HIKEY
+LINUX_COMMON_FLAGS += HIKEY=y
+endif
 
 linux-common: linux-defconfig
 	$(MAKE) -C $(LINUX_PATH) $(LINUX_COMMON_FLAGS)
@@ -273,7 +281,7 @@ OPTEE_OS_CLEAN_COMMON_FLAGS ?= $(OPTEE_OS_COMMON_EXTRA_FLAGS)
 ifeq ($(CFG_TEE_BENCHMARK),y)
 optee-os-clean-common: benchmark-app-clean-common
 endif
-optee-os-clean-common: xtest-clean helloworld-clean
+optee-os-clean-common: xtest-clean helloworld-clean optee-app-clean
 	$(MAKE) -C $(OPTEE_OS_PATH) $(OPTEE_OS_CLEAN_COMMON_FLAGS) clean
 
 OPTEE_CLIENT_COMMON_FLAGS ?= CROSS_COMPILE=$(CROSS_COMPILE_NS_USER) \
@@ -330,6 +338,31 @@ helloworld-clean-common:
 	$(MAKE) -C $(HELLOWORLD_PATH) $(HELLOWORLD_CLEAN_COMMON_FLAGS) clean
 
 ################################################################################
+# optee_app
+################################################################################
+ifeq ($(DEBUG),1)
+CFG_TEE_TA_LOG_LEVEL = 4
+else
+CFG_TEE_TA_LOG_LEVEL = 2
+endif
+
+OPTEE_APP_COMMON_FLAGS = HIKEY=y\
+	HOST_CROSS_COMPILE=$(CROSS_COMPILE_NS_USER)\
+	TA_CROSS_COMPILE=$(CROSS_COMPILE_S_USER) \
+	TA_DEV_KIT_DIR=$(OPTEE_OS_TA_DEV_KIT_DIR) \
+	TEEC_EXPORT=$(OPTEE_CLIENT_EXPORT) \
+	ARMCC=aarch64-linux-gnu-gcc \
+	CFG_TEE_TA_LOG_LEVEL=$(CFG_TEE_TA_LOG_LEVEL)
+
+optee-app-common: optee-os optee-client
+	$(MAKE) -C $(OPTEE_APP_PATH) $(OPTEE_APP_COMMON_FLAGS)
+
+OPTEE_APP_CLEAN_COMMON_FLAGS ?= TA_DEV_KIT_DIR=$(OPTEE_OS_TA_DEV_KIT_DIR)
+
+optee-app-clean-common:
+	$(MAKE) -C $(OPTEE_APP_PATH) $(OPTEE_APP_CLEAN_COMMON_FLAGS) clean
+
+################################################################################
 # benchmark_app
 ################################################################################
 BENCHMARK_APP_COMMON_FLAGS ?= HOST_CROSS_COMPILE=$(CROSS_COMPILE_NS_USER) \
@@ -362,7 +395,7 @@ ifeq ($(CFG_TEE_BENCHMARK),y)
 filelist-tee-common: benchmark-app
 endif
 filelist-tee-common: fl:=$(GEN_ROOTFS_FILELIST)
-filelist-tee-common: optee-client xtest helloworld
+filelist-tee-common: optee-client xtest helloworld optee-app
 	@echo "# filelist-tee-common /start" 				> $(fl)
 	@echo "dir /lib/optee_armtz 755 0 0" 				>> $(fl)
 	@echo "# xtest / optee_test" 					>> $(fl)

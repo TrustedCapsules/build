@@ -51,57 +51,61 @@ endif
 ################################################################################
 # Paths to git projects and various binaries
 ################################################################################
-ARM_TF_PATH			?= $(ROOT)/arm-trusted-firmware
+ARM_TF_PATH			= $(ROOT)/arm-trusted-firmware
 ifeq ($(DEBUG),1)
-ARM_TF_BUILD			?= debug
+ARM_TF_BUILD		= debug
 else
-ARM_TF_BUILD			?= release
+ARM_TF_BUILD		= release
 endif
 
-EDK2_PATH 			?= $(ROOT)/edk2
+EDK2_PATH 			= $(ROOT)/edk2
 ifeq ($(DEBUG),1)
-EDK2_BIN 			?= $(EDK2_PATH)/Build/HiKey/DEBUG_GCC49/FV/BL33_AP_UEFI.fd
-EDK2_BUILD			?= DEBUG
+EDK2_BIN 			= $(EDK2_PATH)/Build/HiKey/DEBUG_GCC49/FV/BL33_AP_UEFI.fd
+EDK2_BUILD			= DEBUG
 else
-EDK2_BIN 			?= $(EDK2_PATH)/Build/HiKey/RELEASE_GCC49/FV/BL33_AP_UEFI.fd
-EDK2_BUILD			?= RELEASE
+EDK2_BIN 			= $(EDK2_PATH)/Build/HiKey/RELEASE_GCC49/FV/BL33_AP_UEFI.fd
+EDK2_BUILD			= RELEASE
 endif
-OPENPLATPKG_PATH		?= $(ROOT)/OpenPlatformPkg
+OPENPLATPKG_PATH	= $(ROOT)/OpenPlatformPkg
 
-OUT_PATH			?= $(ROOT)/out
-MCUIMAGE_BIN			?= $(OPENPLATPKG_PATH)/Platforms/Hisilicon/HiKey/Binary/mcuimage.bin
-BOOT_IMG			?= $(OUT_PATH)/boot-fat.uefi.img
-NVME_IMG			?= $(OUT_PATH)/nvme.img
-SYSTEM_IMG			?= $(OUT_PATH)/debian_system.img
-WIFI_FW				?= $(OUT_PATH)/firmware-ti-connectivity_20161130-3_all.deb
-GRUB_PATH			?= $(ROOT)/grub
-GRUB_CONFIGFILE			?= $(OUT_PATH)/grub.configfile
-LLOADER_PATH			?= $(ROOT)/l-loader
-PATCHES_PATH			?= $(ROOT)/patches_hikey
-DEBPKG_PATH			?= $(OUT_PATH)/optee_$(OPTEE_PKG_VERSION)
-DEBPKG_SRC_PATH			?= $(ROOT)/debian-kernel-packaging
-DEBPKG_BIN_PATH			?= $(DEBPKG_PATH)/usr/bin
-DEBPKG_LIB_PATH			?= $(DEBPKG_PATH)/usr/lib/$(MULTIARCH)
-DEBPKG_TA_PATH			?= $(DEBPKG_PATH)/lib/optee_armtz
-DEBPKG_CONTROL_PATH		?= $(DEBPKG_PATH)/DEBIAN
+OUT_PATH			= $(ROOT)/out
+MCUIMAGE_BIN		= $(OPENPLATPKG_PATH)/Platforms/Hisilicon/HiKey/Binary/mcuimage.bin
+BOOT_IMG			= $(OUT_PATH)/boot-fat.uefi.img
+NVME_IMG			= $(OUT_PATH)/nvme.img
+SYSTEM_IMG			= $(OUT_PATH)/debian_system.img
+WIFI_FW				= $(OUT_PATH)/firmware-ti-connectivity_20161130-3_all.deb
+GRUB_PATH			= $(ROOT)/grub
+GRUB_CONFIGFILE		= $(OUT_PATH)/grub.configfile
+LLOADER_PATH		= $(ROOT)/l-loader
+PATCHES_PATH		= $(ROOT)/patches_hikey
+DEBPKG_PATH			= $(OUT_PATH)/optee_$(OPTEE_PKG_VERSION)
+DEBPKG_SRC_PATH		= $(ROOT)/debian-kernel-packaging
+DEBPKG_ROOT_PATH	= $(DEBPKG_PATH)/root
+DEBPKG_BIN_PATH		= $(DEBPKG_PATH)/usr/bin
+DEBPKG_LIB_PATH		= $(DEBPKG_PATH)/usr/lib/$(MULTIARCH)
+DEBPKG_TA_PATH		= $(DEBPKG_PATH)/lib/optee_armtz
+DEBPKG_CAPSULE_PATH	= $(DEBPKG_PATH)/etc/
+DEBPKG_CONTROL_PATH	= $(DEBPKG_PATH)/DEBIAN
 
 ################################################################################
 # Targets
 ################################################################################
 all: arm-tf linux boot-img lloader system-img nvme deb
 
-clean: arm-tf-clean edk2-clean linux-clean optee-os-clean optee-client-clean xtest-clean helloworld-clean boot-img-clean lloader-clean grub-clean
+clean: arm-tf-clean edk2-clean linux-clean optee-os-clean optee-client-clean xtest-clean optee-app-clean helloworld-clean boot-img-clean lloader-clean grub-clean
 
 cleaner: clean prepare-cleaner linux-cleaner nvme-cleaner system-img-cleaner grub-cleaner
 
 -include toolchain.mk
 
 prepare:
+	@echo $(OUT_PATH)
 	@mkdir -p $(OUT_PATH)
 
 .PHONY: prepare-cleaner
 prepare-cleaner:
 	rm -rf $(ROOT)/out
+	rm ../linux-*
 
 ################################################################################
 # ARM Trusted Firmware
@@ -234,6 +238,13 @@ helloworld: helloworld-common
 helloworld-clean: helloworld-clean-common
 
 ################################################################################
+# optee_app
+################################################################################
+optee-app: optee-app-common
+
+optee-app-clean: optee-app-clean-common
+
+################################################################################
 # grub
 ################################################################################
 grub-flags := CC="$(CCACHE)gcc" \
@@ -361,17 +372,32 @@ endef
 export CONTROL_TEXT
 
 .PHONY: deb
-deb: prepare xtest helloworld optee-client
+deb: prepare xtest helloworld optee-app optee-client
 	@mkdir -p $(DEBPKG_BIN_PATH) && cd $(DEBPKG_BIN_PATH) && \
 		cp -f $(OPTEE_CLIENT_EXPORT)/bin/tee-supplicant . && \
 		cp -f $(OPTEE_TEST_OUT_PATH)/xtest/xtest . && \
-		cp -f $(HELLOWORLD_PATH)/host/hello_world .
+		cp -f $(HELLOWORLD_PATH)/host/hello_world . && \
+		cp -f $(OPTEE_APP_PATH)/host/capsule_test . && \
+		cp -f $(OPTEE_APP_PATH)/host/capsule_test_network . && \
+		cp -f $(OPTEE_APP_PATH)/host/capsule_test_policy .
 
 	@mkdir -p $(DEBPKG_LIB_PATH) && cd $(DEBPKG_LIB_PATH) && \
 		cp $(OPTEE_CLIENT_EXPORT)/lib/libtee* .
 
+	@mkdir -p $(DEBPKG_CAPSULE_PATH) && cd $(DEBPKG_CAPSULE_PATH)
+
+	@mkdir -p $(DEBPKG_CAPSULE_PATH)/other_capsules && cd $(DEBPKG_CAPSULE_PATH)/other_capsules && \
+		find $(OPTEE_APP_PATH)/capsule_gen/capsules/ -maxdepth 1 -type f -exec cp {} . \;
+	
+	@mkdir -p $(DEBPKG_CAPSULE_PATH)/test_capsules  && cd $(DEBPKG_CAPSULE_PATH)/test_capsules && \
+		cp -f $(OPTEE_APP_PATH)/capsule_gen/capsules/test_capsules/* .
+	
+	@mkdir -p $(DEBPKG_CAPSULE_PATH)/use_case_capsules && cd $(DEBPKG_CAPSULE_PATH)/use_case_capsules && \
+		cp -f $(OPTEE_APP_PATH)/capsule_gen/capsules/use_case_capsules/* . 
+
 	@mkdir -p $(DEBPKG_TA_PATH) && cd $(DEBPKG_TA_PATH) && \
-		cp $(HELLOWORLD_PATH)/ta/*.ta . && \
+		cp $(HELLOWORLD_PATH)/ta/*.ta .  && \
+		cp $(OPTEE_APP_PATH)/ta/*.ta . && \
 		find $(OPTEE_TEST_OUT_PATH)/ta -name "*.ta" -exec cp {} . \;
 
 	@mkdir -p $(DEBPKG_CONTROL_PATH)
@@ -412,7 +438,7 @@ recovery:
 	@echo "Jumper 1-2: Closed (Auto power up = Boot up when power is applied)"
 	@echo "       3-4: Closed (Boot Select = Recovery: program eMMC from USB OTG)"
 	$(call flash_help)
-	python $(ROOT)/burn-boot/hisi-idt.py --img1=$(LLOADER_PATH)/l-loader.bin
+	sudo python $(ROOT)/burn-boot/hisi-idt.py --img1=$(LLOADER_PATH)/l-loader.bin
 	@$(MAKE) --no-print flash FROM_RECOVERY=1
 
 .PHONY: flash
@@ -430,23 +456,23 @@ endif
 	@echo "If the board stalls while flashing $(SYSTEM_IMG),"
 	@echo "i.e. does not complete after more than 5 minutes,"
 	@echo "please try running 'make recovery' instead"
-	fastboot flash ptable $(LLOADER_PATH)/ptable-linux-$(CFG_FLASH_SIZE)g.img
-	fastboot flash fastboot $(ARM_TF_PATH)/build/hikey/$(ARM_TF_BUILD)/fip.bin
-	fastboot flash nvme $(NVME_IMG)
-	fastboot flash boot $(BOOT_IMG)
-	fastboot flash system $(SYSTEM_IMG)
+	sudo fastboot flash ptable $(LLOADER_PATH)/ptable-linux-$(CFG_FLASH_SIZE)g.img
+	sudo fastboot flash fastboot $(ARM_TF_PATH)/build/hikey/$(ARM_TF_BUILD)/fip.bin
+	sudo fastboot flash nvme $(NVME_IMG)
+	sudo fastboot flash boot $(BOOT_IMG)
+	sudo fastboot flash system $(SYSTEM_IMG)
 
 .PHONY: flash-fip
 flash-fip:
-	fastboot flash fastboot $(ARM_TF_PATH)/build/hikey/$(ARM_TF_BUILD)/fip.bin
+	sudo fastboot flash fastboot $(ARM_TF_PATH)/build/hikey/$(ARM_TF_BUILD)/fip.bin
 
 .PHONY: flash-boot-img
 flash-boot-img: boot-img
-	fastboot flash boot $(BOOT_IMG)
+	sudo fastboot flash boot $(BOOT_IMG)
 
 .PHONY: flash-system-img
 flash-system-img: system-img
-	fastboot flash system $(SYSTEM_IMG)
+	sudo fastboot flash system $(SYSTEM_IMG)
 
 .PHONY: help
 help:

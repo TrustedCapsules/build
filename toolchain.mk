@@ -39,13 +39,13 @@ toolchains: aarch32 aarch64 aarch64-legacy
 
 .PHONY: aarch32
 aarch32:
-	$(call dltc,$(AARCH32_PATH),$(SRC_AARCH32_GCC),$(AARCH32_GCC_VERSION))
+	$(call dltc, $(AARCH32_PATH),$(SRC_AARCH32_GCC),$(AARCH32_GCC_VERSION))
 
 .PHONY: aarch64
 aarch64:
-	$(call dltc,$(AARCH64_PATH),$(SRC_AARCH64_GCC),$(AARCH64_GCC_VERSION))
+	$(call dltc, $(AARCH64_PATH),$(SRC_AARCH64_GCC),$(AARCH64_GCC_VERSION))
 
 .PHONY: aarch64-legacy
 aarch64-legacy:
-	$(call dltc,$(LEGACY_AARCH64_PATH),$(LEGACY_SRC_AARCH64_GCC),$(LEGACY_AARCH64_GCC_VERSION))
+	$(call dltc, $(LEGACY_AARCH64_PATH),$(LEGACY_SRC_AARCH64_GCC),$(LEGACY_AARCH64_GCC_VERSION))
 
