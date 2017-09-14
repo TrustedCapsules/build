@@ -371,6 +371,9 @@ endef
 
 export CONTROL_TEXT
 
+.PHONY: deb-clean
+deb-clean: xtest-clean helloworld-clean optee-app-clean optee-client-clean
+
 .PHONY: deb
 deb: prepare xtest helloworld optee-app optee-client
 	@mkdir -p $(DEBPKG_BIN_PATH) && cd $(DEBPKG_BIN_PATH) && \

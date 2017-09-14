@@ -24,7 +24,7 @@ BENCHMARK_APP_PATH		= $(ROOT)/optee_benchmark
 #HIKEY					= y
 
 # default high verbosity. slow uarts shall specify lower if prefered
-CFG_TEE_CORE_LOG_LEVEL		?= 3
+CFG_TEE_CORE_LOG_LEVEL		?= 2
 
 # default disable latency benchmarks (over all OP-TEE layers)
 CFG_TEE_BENCHMARK			?= n
