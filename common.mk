@@ -113,6 +113,7 @@ endif
 # set the compiler when COMPILE_xxx are defined
 ################################################################################
 CROSS_COMPILE_NS_USER   ?= "$(CCACHE)$(AARCH$(COMPILE_NS_USER)_CROSS_COMPILE)"
+CROSS_COMPILE_NS_USER_BENCH ?= "$(AARCH$(COMPILE_NS_USER)_CROSS_COMPILE)"
 CROSS_COMPILE_NS_KERNEL ?= "$(CCACHE)$(AARCH$(COMPILE_NS_KERNEL)_CROSS_COMPILE)"
 CROSS_COMPILE_S_USER    ?= "$(CCACHE)$(AARCH$(COMPILE_S_USER)_CROSS_COMPILE)"
 CROSS_COMPILE_S_KERNEL  ?= "$(CCACHE)$(AARCH$(COMPILE_S_KERNEL)_CROSS_COMPILE)"
@@ -412,7 +413,7 @@ optee-app-clean-common:
 ################################################################################
 # benchmark_app
 ################################################################################
-BENCHMARK_APP_COMMON_FLAGS ?= CROSS_COMPILE=$(CROSS_COMPILE_NS_USER) \
+BENCHMARK_APP_COMMON_FLAGS ?= CROSS_COMPILE=$(CROSS_COMPILE_NS_USER_BENCH) \
 	TEEC_EXPORT=$(OPTEE_CLIENT_EXPORT) \
 	TEEC_INTERNAL_INCLUDES=$(OPTEE_CLIENT_PATH)/libteec \
 	MULTIARCH=$(MULTIARCH)
