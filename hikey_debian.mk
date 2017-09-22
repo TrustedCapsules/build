@@ -40,15 +40,6 @@ endif
 OPTEE_PKG_VERSION := $(shell cd $(OPTEE_OS_PATH) && git describe)-0
 
 ################################################################################
-# Mandatory definition to use common.mk
-################################################################################
-ifeq ($(COMPILE_NS_USER),64)
-MULTIARCH			:= aarch64-linux-gnu
-else
-MULTIARCH			:= arm-linux-gnueabihf
-endif
-
-################################################################################
 # Paths to git projects and various binaries
 ################################################################################
 ARM_TF_PATH			= $(ROOT)/arm-trusted-firmware
@@ -90,11 +81,14 @@ DEBPKG_CONTROL_PATH	= $(DEBPKG_PATH)/DEBIAN
 ################################################################################
 # Targets
 ################################################################################
-all: arm-tf linux boot-img lloader system-img nvme deb
+all: arm-tf linux boot-img lloader system-img nvme deb optee-examples
 
-clean: arm-tf-clean edk2-clean linux-clean optee-os-clean optee-client-clean xtest-clean optee-app-clean helloworld-clean boot-img-clean lloader-clean grub-clean
+clean: arm-tf-clean edk2-clean linux-clean optee-os-clean optee-client-clean \
+		xtest-clean boot-img-clean lloader-clean grub-clean \
+		optee-app-clean helloworld-clean 
 
-cleaner: clean prepare-cleaner linux-cleaner nvme-cleaner system-img-cleaner grub-cleaner
+cleaner: clean prepare-cleaner linux-cleaner nvme-cleaner \
+			system-img-cleaner grub-cleaner
 
 -include toolchain.mk
 
@@ -231,11 +225,11 @@ xtest-clean: xtest-clean-common
 xtest-patch: xtest-patch-common
 
 ################################################################################
-# hello_world
+# Sample applications / optee_examples
 ################################################################################
-helloworld: helloworld-common
+optee-examples: optee-examples-common
 
-helloworld-clean: helloworld-clean-common
+optee-examples-clean: optee-examples-clean-common
 
 ################################################################################
 # benchmark_app
@@ -371,7 +365,7 @@ Architecture: arm64
 Depends:
 Maintainer: Joakim Bech <joakim.bech@linaro.org>
 Description: OP-TEE client binaries, test program and Trusted Applications
- Package contains tee-supplicant, libtee.so, xtest, hello_world and a set of
+ Package contains tee-supplicant, libtee.so, xtest, optee-examples and a set of
  Trusted Applications.
  NOTE! This package should only be used for testing and development.
 endef
@@ -409,7 +403,6 @@ deb: prepare xtest helloworld optee-app optee-client
 		cp $(HELLOWORLD_PATH)/ta/*.ta .  && \
 		cp $(OPTEE_APP_PATH)/ta/*.ta . && \
 		find $(OPTEE_TEST_OUT_PATH)/ta -name "*.ta" -exec cp {} . \;
-
 	@mkdir -p $(DEBPKG_CONTROL_PATH)
 	@echo "$$CONTROL_TEXT" > $(DEBPKG_CONTROL_PATH)/control
 	@cd $(OUT_PATH) && dpkg-deb --build optee_$(OPTEE_PKG_VERSION)

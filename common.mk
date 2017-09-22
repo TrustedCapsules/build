@@ -19,6 +19,7 @@ OPTEE_TEST_OUT_PATH		= $(ROOT)/optee_test/out
 HELLOWORLD_PATH			= $(ROOT)/hello_world
 OPTEE_APP_PATH			= $(ROOT)/optee_app
 BENCHMARK_APP_PATH		= $(ROOT)/optee_benchmark
+LIBYAML_LIB_PATH		= $(BENCHMARK_APP_PATH)/libyaml/out/lib
 
 # If building on Hikey
 #HIKEY					= y
@@ -40,6 +41,16 @@ QEMU_VIRTFS_HOST_DIR	?= $(ROOT)
 
 # Enable SLiRP user networking
 QEMU_USERNET_ENABLE		?= n
+
+################################################################################
+# Mandatory for autotools (for specifying --host)
+################################################################################
+ifeq ($(COMPILE_NS_USER),64)
+MULTIARCH			:= aarch64-linux-gnu
+else
+MULTIARCH			:= arm-linux-gnueabihf
+endif
+
 ################################################################################
 # Check coherency of compilation mode
 ################################################################################
@@ -79,7 +90,10 @@ endif
 
 ifneq ($(COMPILE_S_KERNEL),)
 OPTEE_OS_COMMON_EXTRA_FLAGS ?= O=out/arm
-OPTEE_OS_BIN		    = $(OPTEE_OS_PATH)/out/arm/core/tee.bin
+OPTEE_OS_BIN		    	?= $(OPTEE_OS_PATH)/out/arm/core/tee.bin
+OPTEE_OS_HEADER_V2_BIN	    ?= $(OPTEE_OS_PATH)/out/arm/core/tee-header_v2.bin
+OPTEE_OS_PAGER_V2_BIN	    ?= $(OPTEE_OS_PATH)/out/arm/core/tee-pager_v2.bin
+OPTEE_OS_PAGEABLE_V2_BIN    ?= $(OPTEE_OS_PATH)/out/arm/core/tee-pageable_v2.bin
 ifeq ($(COMPILE_S_USER),)
 $(error COMPILE_S_USER must be defined as COMPILE_S_KERNEL=$(COMPILE_S_KERNEL) is defined)
 endif
@@ -121,11 +135,19 @@ endif
 define KERNEL_VERSION
 $(shell cd $(LINUX_PATH) && $(MAKE) --no-print-directory kernelversion)
 endef
+
+# Read stdin, expand ${VAR} environment variables, output to stdout
+# http://superuser.com/a/302847
+define expand-env-var
+awk '{while(match($$0,"[$$]{[^}]*}")) {var=substr($$0,RSTART+2,RLENGTH -3);gsub("[$$]{"var"}",ENVIRON[var])}}1'
+endef
+
 DEBUG ?= 0
 
 ################################################################################
 # default target is all
 ################################################################################
+.PHONY: all
 all:
 
 ################################################################################
@@ -134,6 +156,7 @@ all:
 BUSYBOX_COMMON_TARGET		?= TOBEDEFINED
 BUSYBOX_CLEAN_COMMON_TARGET	?= TOBEDEFINED
 
+.PHONY: busybox-common
 busybox-common: linux
 	cd $(GEN_ROOTFS_PATH) &&  \
 		CROSS_COMPILE=$(CROSS_COMPILE_NS_USER) \
@@ -141,11 +164,13 @@ busybox-common: linux
 		$(GEN_ROOTFS_PATH)/generate-cpio-rootfs.sh \
 			$(BUSYBOX_COMMON_TARGET)
 
+.PHONY: busybox-clean-common
 busybox-clean-common:
 	cd $(GEN_ROOTFS_PATH) && \
 	$(GEN_ROOTFS_PATH)/generate-cpio-rootfs.sh  \
 		$(BUSYBOX_CLEAN_COMMON_TARGET)
 
+.PHONY: busybox-cleaner-common
 busybox-cleaner-common:
 	rm -rf $(GEN_ROOTFS_PATH)/build
 	rm -rf $(GEN_ROOTFS_PATH)/filelist-final.txt
@@ -163,6 +188,7 @@ ifdef HIKEY
 LINUX_COMMON_FLAGS += HIKEY=y
 endif
 
+.PHONY: linux-common
 linux-common: linux-defconfig
 	$(MAKE) -C $(LINUX_PATH) $(LINUX_COMMON_FLAGS)
 
@@ -172,18 +198,17 @@ $(LINUX_PATH)/.config: $(LINUX_DEFCONFIG_COMMON_FILES)
 		scripts/kconfig/merge_config.sh $(LINUX_DEFCONFIG_COMMON_FILES) \
 			$(LINUX_DEFCONFIG_BENCH)
 
+.PHONY: linux-defconfig-clean-common
 linux-defconfig-clean-common:
 	rm -f $(LINUX_PATH)/.config
 
-# LINUX_CLEAN_COMMON_FLAGS can be defined in specific makefiles (hikey.mk,...)
-# if necessary
-
+# LINUX_CLEAN_COMMON_FLAGS should be defined in specific makefiles (hikey.mk,...)
+.PHONY: linux-clean-common
 linux-clean-common: linux-defconfig-clean
 	$(MAKE) -C $(LINUX_PATH) $(LINUX_CLEAN_COMMON_FLAGS) clean
 
-# LINUX_CLEANER_COMMON_FLAGS can be defined in specific makefiles (hikey.mk,...)
-# if necessary
-
+# LINUX_CLEANER_COMMON_FLAGS should be defined in specific makefiles (hikey.mk,...)
+.PHONY: linux-cleaner-common
 linux-cleaner-common: linux-defconfig-clean
 	$(MAKE) -C $(LINUX_PATH) $(LINUX_CLEANER_COMMON_FLAGS) distclean
 
@@ -196,18 +221,22 @@ $(EDK2_PATH)/Conf/target.txt:
 	set -e && cd $(EDK2_PATH) && source edksetup.sh && \
 	$(MAKE) -j1 -C $(EDK2_PATH)/BaseTools
 
+.PHONY: edk2-common
 edk2-common: $(EDK2_PATH)/Conf/target.txt
 	set -e && cd $(EDK2_PATH) && source edksetup.sh && \
 	$(call edk2-call)
 
+.PHONY: edk2-clean-common
 edk2-clean-common:
 	set -e && cd $(EDK2_PATH) && source edksetup.sh && \
 	$(call edk2-call) clean && \
 	$(MAKE) -j1 -C $(EDK2_PATH)/BaseTools clean
 	rm -rf $(EDK2_PATH)/Build
+	rm -rf $(EDK2_PATH)/Conf/.cache
 	rm -f $(EDK2_PATH)/Conf/build_rule.txt
 	rm -f $(EDK2_PATH)/Conf/target.txt
 	rm -f $(EDK2_PATH)/Conf/tools_def.txt
+
 ################################################################################
 # QEMU / QEMUv8
 ################################################################################
@@ -236,6 +265,12 @@ define run-help
 	@echo
 endef
 
+ifneq (, $(LAUNCH_TERMINAL))
+define launch-terminal
+	@nc -z  127.0.0.1 $(1) || \
+		$(LAUNCH_TERMINAL) $(SOC_TERM_PATH)/soc_term $(1) &
+endef
+else
 gnome-terminal := $(shell command -v gnome-terminal 2>/dev/null)
 xterm := $(shell command -v xterm 2>/dev/null)
 ifdef gnome-terminal
@@ -253,6 +288,7 @@ define launch-terminal
 endef
 else
 check-terminal := @echo "Error: could not find gnome-terminal nor xterm" ; false
+endif
 endif
 endif
 
@@ -273,26 +309,31 @@ OPTEE_OS_COMMON_FLAGS ?= \
 	DEBUG=$(DEBUG) \
 	CFG_TEE_BENCHMARK=$(CFG_TEE_BENCHMARK)
 
+.PHONY: optee-os-common
 optee-os-common:
 	$(MAKE) -C $(OPTEE_OS_PATH) $(OPTEE_OS_COMMON_FLAGS)
 
 OPTEE_OS_CLEAN_COMMON_FLAGS ?= $(OPTEE_OS_COMMON_EXTRA_FLAGS)
 
+.PHONY: optee-os-clean-common
 ifeq ($(CFG_TEE_BENCHMARK),y)
 optee-os-clean-common: benchmark-app-clean-common
 endif
+
 optee-os-clean-common: xtest-clean helloworld-clean optee-app-clean
 	$(MAKE) -C $(OPTEE_OS_PATH) $(OPTEE_OS_CLEAN_COMMON_FLAGS) clean
 
 OPTEE_CLIENT_COMMON_FLAGS ?= CROSS_COMPILE=$(CROSS_COMPILE_NS_USER) \
 	CFG_TEE_BENCHMARK=$(CFG_TEE_BENCHMARK) \
 
+.PHONY: optee-client-common
 optee-client-common:
 	$(MAKE) -C $(OPTEE_CLIENT_PATH) $(OPTEE_CLIENT_COMMON_FLAGS)
 
 # OPTEE_CLIENT_CLEAN_COMMON_FLAGS can be defined in specific makefiles
 # (hikey.mk,...) if necessary
 
+.PHONY: optee-client-clean-common
 optee-client-clean-common:
 	$(MAKE) -C $(OPTEE_CLIENT_PATH) $(OPTEE_CLIENT_CLEAN_COMMON_FLAGS) \
 		clean
@@ -307,35 +348,41 @@ XTEST_COMMON_FLAGS ?= CROSS_COMPILE_HOST=$(CROSS_COMPILE_NS_USER)\
 	COMPILE_NS_USER=$(COMPILE_NS_USER) \
 	O=$(OPTEE_TEST_OUT_PATH)
 
+.PHONY: xtest-common
 xtest-common: optee-os optee-client
 	$(MAKE) -C $(OPTEE_TEST_PATH) $(XTEST_COMMON_FLAGS)
 
 XTEST_CLEAN_COMMON_FLAGS ?= O=$(OPTEE_TEST_OUT_PATH) \
 	TA_DEV_KIT_DIR=$(OPTEE_OS_TA_DEV_KIT_DIR) \
 
+.PHONY: xtest-clean-common
 xtest-clean-common:
 	$(MAKE) -C $(OPTEE_TEST_PATH) $(XTEST_CLEAN_COMMON_FLAGS) clean
 
 XTEST_PATCH_COMMON_FLAGS ?= $(XTEST_COMMON_FLAGS)
 
+.PHONY: xtest-patch-common
 xtest-patch-common:
 	$(MAKE) -C $(OPTEE_TEST_PATH) $(XTEST_PATCH_COMMON_FLAGS) patch
 
 ################################################################################
-# hello_world
+# sample applications / optee_examples
 ################################################################################
-HELLOWORLD_COMMON_FLAGS ?= HOST_CROSS_COMPILE=$(CROSS_COMPILE_NS_USER)\
+OPTEE_EXAMPLES_COMMON_FLAGS ?= HOST_CROSS_COMPILE=$(CROSS_COMPILE_NS_USER)\
 	TA_CROSS_COMPILE=$(CROSS_COMPILE_S_USER) \
 	TA_DEV_KIT_DIR=$(OPTEE_OS_TA_DEV_KIT_DIR) \
 	TEEC_EXPORT=$(OPTEE_CLIENT_EXPORT)
 
-helloworld-common: optee-os optee-client
-	$(MAKE) -C $(HELLOWORLD_PATH) $(HELLOWORLD_COMMON_FLAGS)
+.PHONY: optee-examples-common
+optee-examples-common: optee-os optee-client
+	$(MAKE) -C $(OPTEE_EXAMPLES_PATH) $(OPTEE_EXAMPLES_COMMON_FLAGS)
 
-HELLOWORLD_CLEAN_COMMON_FLAGS ?= TA_DEV_KIT_DIR=$(OPTEE_OS_TA_DEV_KIT_DIR)
+OPTEE_EXAMPLES_CLEAN_COMMON_FLAGS ?= TA_DEV_KIT_DIR=$(OPTEE_OS_TA_DEV_KIT_DIR)
 
-helloworld-clean-common:
-	$(MAKE) -C $(HELLOWORLD_PATH) $(HELLOWORLD_CLEAN_COMMON_FLAGS) clean
+.PHONY: optee-examples-clean-common
+optee-examples-clean-common:
+	$(MAKE) -C $(OPTEE_EXAMPLES_PATH) \
+			$(OPTEE_EXAMPLES_CLEAN_COMMON_FLAGS) clean
 
 ################################################################################
 # optee_app
@@ -365,19 +412,23 @@ optee-app-clean-common:
 ################################################################################
 # benchmark_app
 ################################################################################
-BENCHMARK_APP_COMMON_FLAGS ?= HOST_CROSS_COMPILE=$(CROSS_COMPILE_NS_USER) \
+BENCHMARK_APP_COMMON_FLAGS ?= CROSS_COMPILE=$(CROSS_COMPILE_NS_USER) \
 	TEEC_EXPORT=$(OPTEE_CLIENT_EXPORT) \
-	TEEC_INTERNAL_INCLUDES=$(OPTEE_CLIENT_PATH)/libteec
+	TEEC_INTERNAL_INCLUDES=$(OPTEE_CLIENT_PATH)/libteec \
+	MULTIARCH=$(MULTIARCH)
 
+.PHONY: benchmark-app-common
 benchmark-app-common: optee-os optee-client
 	$(MAKE) -C $(BENCHMARK_APP_PATH) $(BENCHMARK_APP_COMMON_FLAGS)
 
+.PHONY: benchmark-app-clean-common
 benchmark-app-clean-common:
 	$(MAKE) -C $(BENCHMARK_APP_PATH) clean
 
 ################################################################################
 # rootfs
 ################################################################################
+.PHONY: update_rootfs-common
 update_rootfs-common: busybox filelist-tee
 	cat $(GEN_ROOTFS_PATH)/filelist-final.txt > $(GEN_ROOTFS_PATH)/filelist.tmp
 	cat $(GEN_ROOTFS_FILELIST) >> $(GEN_ROOTFS_PATH)/filelist.tmp
@@ -385,35 +436,47 @@ update_rootfs-common: busybox filelist-tee
 	        $(LINUX_PATH)/usr/gen_init_cpio $(GEN_ROOTFS_PATH)/filelist.tmp | \
 			gzip > $(GEN_ROOTFS_PATH)/filesystem.cpio.gz
 
+.PHONY: update_rootfs-clean-common
 update_rootfs-clean-common:
 	rm -f $(GEN_ROOTFS_PATH)/filesystem.cpio.gz
 	rm -f $(GEN_ROOTFS_PATH)/filelist-all.txt
 	rm -f $(GEN_ROOTFS_PATH)/filelist-tmp.txt
 	rm -f $(GEN_ROOTFS_FILELIST)
 
+.PHONY: filelist-tee-common
 ifeq ($(CFG_TEE_BENCHMARK),y)
 filelist-tee-common: benchmark-app
 endif
 filelist-tee-common: fl:=$(GEN_ROOTFS_FILELIST)
+
 filelist-tee-common: optee-client xtest helloworld optee-app
 	@echo "# filelist-tee-common /start" 				> $(fl)
 	@echo "dir /lib/optee_armtz 755 0 0" 				>> $(fl)
+	@if [ -e $(OPTEE_EXAMPLES_PATH)/out/ca ]; then \
+		for file in $(OPTEE_EXAMPLES_PATH)/out/ca/*; do \
+			echo "file /usr/bin/$$(basename $$file)" \
+			"$$file 755 0 0"				>> $(fl); \
+		done; \
+	fi
+	@if [ -e $(OPTEE_EXAMPLES_PATH)/out/ta ]; then \
+		for file in $(OPTEE_EXAMPLES_PATH)/out/ta/*; do \
+			echo "file /lib/optee_armtz/$$(basename $$file)" \
+			"$$file 755 0 0"				>> $(fl); \
+		done; \
+	fi
 	@echo "# xtest / optee_test" 					>> $(fl)
 	@find $(OPTEE_TEST_OUT_PATH) -type f -name "xtest" | \
 		sed 's/\(.*\)/file \/bin\/xtest \1 755 0 0/g' 		>> $(fl)
 	@find $(OPTEE_TEST_OUT_PATH) -name "*.ta" | \
 		sed 's/\(.*\)\/\(.*\)/file \/lib\/optee_armtz\/\2 \1\/\2 444 0 0/g' \
 									>> $(fl)
-	@if [ -e $(HELLOWORLD_PATH)/host/hello_world ]; then \
-		echo "file /bin/hello_world" \
-			"$(HELLOWORLD_PATH)/host/hello_world 755 0 0"	>> $(fl); \
-		echo "file /lib/optee_armtz/8aaaf200-2450-11e4-abe2-0002a5d5c51b.ta" \
-			"$(HELLOWORLD_PATH)/ta/8aaaf200-2450-11e4-abe2-0002a5d5c51b.ta" \
-			"444 0 0" 					>> $(fl); \
-	fi
 	@if [ -e $(BENCHMARK_APP_PATH)/benchmark ]; then \
 		echo "file /bin/benchmark" \
 			"$(BENCHMARK_APP_PATH)/benchmark 755 0 0"	>> $(fl); \
+		echo "slink /lib/libyaml-0.so.2 libyaml-0.so.2.0.5 755 0 0" \
+									>> $(fl); \
+		echo "file /lib/libyaml-0.so.2.0.5 $(LIBYAML_LIB_PATH)/libyaml-0.so.2.0.5 755 0 0" \
+									>> $(fl); \
 	fi
 	@if [ "$(QEMU_USERNET_ENABLE)" = "y" ]; then \
 		echo "slink /etc/rc.d/S02_udhcp_networking /etc/init.d/udhcpc 755 0 0" \

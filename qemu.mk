@@ -15,6 +15,7 @@ override COMPILE_S_KERNEL  := 32
 ################################################################################
 BIOS_QEMU_PATH			?= $(ROOT)/bios_qemu_tz_arm
 QEMU_PATH			?= $(ROOT)/qemu
+BINARIES_PATH			?= $(ROOT)/out/bin
 
 SOC_TERM_PATH			?= $(ROOT)/soc_term
 
@@ -27,9 +28,10 @@ ifeq ($(CFG_TEE_BENCHMARK),y)
 all: benchmark-app
 clean: benchmark-app-clean
 endif
-all: bios-qemu qemu soc-term
+all: bios-qemu qemu soc-term optee-examples
 clean: bios-qemu-clean busybox-clean linux-clean optee-os-clean \
-	optee-client-clean qemu-clean soc-term-clean check-clean
+	optee-client-clean qemu-clean soc-term-clean check-clean \
+	optee-examples-clean
 
 -include toolchain.mk
 
@@ -40,13 +42,17 @@ define bios-qemu-common
 	+$(MAKE) -C $(BIOS_QEMU_PATH) \
 		CROSS_COMPILE=$(CROSS_COMPILE_NS_USER) \
 		O=$(ROOT)/out/bios-qemu \
-		BIOS_NSEC_BLOB=$(LINUX_PATH)/arch/arm/boot/zImage \
-		BIOS_NSEC_ROOTFS=$(GEN_ROOTFS_PATH)/filesystem.cpio.gz \
-		BIOS_SECURE_BLOB=$(OPTEE_OS_BIN) \
 		PLATFORM_FLAVOR=virt
 endef
 
 bios-qemu: update_rootfs optee-os
+	mkdir -p $(BINARIES_PATH)
+	ln -sf $(OPTEE_OS_HEADER_V2_BIN) $(BINARIES_PATH)
+	ln -sf $(OPTEE_OS_PAGER_V2_BIN) $(BINARIES_PATH)
+	ln -sf $(OPTEE_OS_PAGEABLE_V2_BIN) $(BINARIES_PATH)
+	ln -sf $(LINUX_PATH)/arch/arm/boot/zImage $(BINARIES_PATH)
+	ln -sf $(GEN_ROOTFS_PATH)/filesystem.cpio.gz \
+		$(BINARIES_PATH)/rootfs.cpio.gz
 	$(call bios-qemu-common)
 
 bios-qemu-clean:
@@ -128,11 +134,11 @@ xtest-clean: xtest-clean-common
 xtest-patch: xtest-patch-common
 
 ################################################################################
-# hello_world
+# Sample applications / optee_examples
 ################################################################################
-helloworld: helloworld-common
+optee-examples: optee-examples-common
 
-helloworld-clean: helloworld-clean-common
+optee-examples-clean: optee-examples-clean-common
 
 ################################################################################
 # benchmark
@@ -163,13 +169,14 @@ run-only:
 	$(call launch-terminal,54320,"Normal World")
 	$(call launch-terminal,54321,"Secure World")
 	$(call wait-for-ports,54320,54321)
-	$(QEMU_PATH)/arm-softmmu/qemu-system-arm \
+	(cd $(BINARIES_PATH) && $(QEMU_PATH)/arm-softmmu/qemu-system-arm \
 		-nographic \
 		-serial tcp:localhost:54320 -serial tcp:localhost:54321 \
 		-s -S -machine virt -machine secure=on -cpu cortex-a15 \
+		-d unimp  -semihosting-config enable,target=native \
 		-m 1057 \
 		-bios $(ROOT)/out/bios-qemu/bios.bin \
-		$(QEMU_EXTRA_ARGS)
+		$(QEMU_EXTRA_ARGS) )
 
 
 ifneq ($(filter check,$(MAKECMDGOALS)),)
@@ -182,7 +189,9 @@ check-args += --timeout $(TIMEOUT)
 endif
 
 check: $(CHECK_DEPS)
-	expect qemu-check.exp -- $(check-args) || \
+	cd $(BINARIES_PATH) && \
+		export QEMU=$(ROOT)/qemu/arm-softmmu/qemu-system-arm && \
+		expect $(ROOT)/build/qemu-check.exp -- $(check-args) || \
 		(if [ "$(DUMP_LOGS_ON_ERROR)" ]; then \
 			echo "== $$PWD/serial0.log:"; \
 			cat serial0.log; \

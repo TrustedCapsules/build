@@ -28,10 +28,14 @@ DEBUG = 1
 ################################################################################
 # Targets
 ################################################################################
-all: arm-tf edk2 qemu soc-term linux strace update_rootfs
+ifeq ($(CFG_TEE_BENCHMARK),y)
+all: benchmark-app
+clean: benchmark-app-clean
+endif
+all: arm-tf edk2 qemu soc-term linux strace update_rootfs optee-examples
 clean: arm-tf-clean busybox-clean edk2-clean linux-clean \
 	optee-os-clean optee-client-clean qemu-clean \
-	soc-term-clean check-clean strace-clean
+	soc-term-clean check-clean strace-clean optee-examples-clean
 
 -include toolchain.mk
 
@@ -43,7 +47,9 @@ ARM_TF_EXPORTS ?= \
 	CROSS_COMPILE="$(CCACHE)$(AARCH64_CROSS_COMPILE)"
 
 ARM_TF_FLAGS ?= \
-	BL32=$(OPTEE_OS_BIN) \
+	BL32=$(OPTEE_OS_HEADER_V2_BIN) \
+	BL32_EXTRA1=$(OPTEE_OS_PAGER_V2_BIN) \
+	BL32_EXTRA2=$(OPTEE_OS_PAGEABLE_V2_BIN) \
 	BL33=$(EDK2_BIN) \
 	ARM_TSP_RAM_LOCATION=tdram \
 	PLAT=qemu \
@@ -55,7 +61,12 @@ ARM_TF_FLAGS ?= \
 
 arm-tf: optee-os edk2
 	$(ARM_TF_EXPORTS) $(MAKE) -C $(ARM_TF_PATH) $(ARM_TF_FLAGS) all fip
-	ln -sf $(OPTEE_OS_BIN) $(ARM_TF_PATH)/build/qemu/release/bl32.bin
+	ln -sf $(OPTEE_OS_HEADER_V2_BIN) \
+		$(ARM_TF_PATH)/build/qemu/release/bl32.bin
+	ln -sf $(OPTEE_OS_PAGER_V2_BIN) \
+		$(ARM_TF_PATH)/build/qemu/release/bl32_extra1.bin
+	ln -sf $(OPTEE_OS_PAGEABLE_V2_BIN) \
+		$(ARM_TF_PATH)/build/qemu/release/bl32_extra2.bin
 	ln -sf $(EDK2_BIN) $(ARM_TF_PATH)/build/qemu/release/bl33.bin
 
 arm-tf-clean:
@@ -160,11 +171,11 @@ xtest-clean: xtest-clean-common
 xtest-patch: xtest-patch-common
 
 ################################################################################
-# hello_world
+# Sample applications / optee_examples
 ################################################################################
-helloworld: helloworld-common
+optee-examples: optee-examples-common
 
-helloworld-clean: helloworld-clean-common
+optee-examples-clean: optee-examples-clean-common
 
 ################################################################################
 # strace
@@ -183,6 +194,13 @@ ifneq ("$(wildcard $(STRACE_PATH))","")
 			$(MAKE) -C $(STRACE_PATH) clean && \
 		rm -f $(STRACE_PATH)/Makefile $(STRACE_PATH)/configure
 endif
+
+################################################################################
+# benchmark
+################################################################################
+benchmark-app: benchmark-app-common
+
+benchmark-app-clean: benchmark-app-clean-common
 
 ################################################################################
 # Root FS
