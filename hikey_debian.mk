@@ -105,7 +105,7 @@ prepare:
 .PHONY: prepare-cleaner
 prepare-cleaner:
 	rm -rf $(ROOT)/out
-	rm ../linux-*
+	rm -f ../linux-*
 
 ################################################################################
 # ARM Trusted Firmware
@@ -236,6 +236,13 @@ xtest-patch: xtest-patch-common
 helloworld: helloworld-common
 
 helloworld-clean: helloworld-clean-common
+
+################################################################################
+# benchmark_app
+################################################################################
+benchmark-app: benchmark-app-common
+
+benchmark-app-clean: benchmark-app-clean-common
 
 ################################################################################
 # optee_app
