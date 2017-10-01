@@ -81,11 +81,11 @@ DEBPKG_CONTROL_PATH	= $(DEBPKG_PATH)/DEBIAN
 ################################################################################
 # Targets
 ################################################################################
-all: arm-tf linux boot-img lloader system-img nvme deb optee-examples
+all: arm-tf linux boot-img lloader system-img nvme deb
 
 clean: arm-tf-clean edk2-clean linux-clean optee-os-clean optee-client-clean \
 		xtest-clean boot-img-clean lloader-clean grub-clean \
-		optee-app-clean helloworld-clean 
+		optee-app-clean
 
 cleaner: clean prepare-cleaner linux-cleaner nvme-cleaner \
 			system-img-cleaner grub-cleaner
@@ -174,7 +174,7 @@ LINUX_DEFCONFIG_COMMON_FILES ?= $(DEBPKG_SRC_PATH)/debian/config/config \
 
 linux-defconfig: $(LINUX_PATH)/.config
 
-LINUX_COMMON_FLAGS += ARCH=arm64 deb-pkg LOCALVERSION=-optee-rpb
+LINUX_COMMON_FLAGS += ARCH=arm64 deb-pkg LOCALVERSION=-optee-rpb HIKEY=y
 
 linux: linux-common
 
@@ -373,20 +373,37 @@ endef
 export CONTROL_TEXT
 
 .PHONY: deb-clean
-deb-clean: xtest-clean helloworld-clean optee-app-clean optee-client-clean
+ifeq ($(CFG_TEE_BENCHMARK),y)
+deb-clean: benchmark-app-clean
+endif
+
+deb-clean: xtest-clean optee-app-clean optee-client-clean
 
 .PHONY: deb
-deb: prepare xtest helloworld optee-app optee-client
+ifeq ($(CFG_TEE_BENCHMARK),y)
+deb: benchmark-app
+endif
+
+deb: prepare xtest optee-app optee-client
 	@mkdir -p $(DEBPKG_BIN_PATH) && cd $(DEBPKG_BIN_PATH) && \
 		cp -f $(OPTEE_CLIENT_EXPORT)/bin/tee-supplicant . && \
 		cp -f $(OPTEE_TEST_OUT_PATH)/xtest/xtest . && \
-		cp -f $(HELLOWORLD_PATH)/host/hello_world . && \
+		cp -f $(OPTEE_APP_PATH)/host/capsule_breakdown . && \
 		cp -f $(OPTEE_APP_PATH)/host/capsule_test . && \
 		cp -f $(OPTEE_APP_PATH)/host/capsule_test_network . && \
 		cp -f $(OPTEE_APP_PATH)/host/capsule_test_policy .
+ifeq ($(CFG_TEE_BENCHMARK),y)
+	@cd $(DEBPKG_BIN_PATH) && \
+		cp -f $(BENCHMARK_APP_PATH)/benchmark .
+endif
 
 	@mkdir -p $(DEBPKG_LIB_PATH) && cd $(DEBPKG_LIB_PATH) && \
 		cp $(OPTEE_CLIENT_EXPORT)/lib/libtee* .
+
+ifeq ($(CFG_TEE_BENCHMARK),y)
+	@cd $(DEBPKG_LIB_PATH) && \
+		cp -f $(LIBYAML_LIB_PATH)/libyaml* .
+endif
 
 	@mkdir -p $(DEBPKG_CAPSULE_PATH) && cd $(DEBPKG_CAPSULE_PATH)
 
@@ -400,7 +417,6 @@ deb: prepare xtest helloworld optee-app optee-client
 		cp -f $(OPTEE_APP_PATH)/capsule_gen/capsules/use_case_capsules/* . 
 
 	@mkdir -p $(DEBPKG_TA_PATH) && cd $(DEBPKG_TA_PATH) && \
-		cp $(HELLOWORLD_PATH)/ta/*.ta .  && \
 		cp $(OPTEE_APP_PATH)/ta/*.ta . && \
 		find $(OPTEE_TEST_OUT_PATH)/ta -name "*.ta" -exec cp {} . \;
 	@mkdir -p $(DEBPKG_CONTROL_PATH)

@@ -16,7 +16,6 @@ OPTEE_CLIENT_PATH		= $(ROOT)/optee_client
 OPTEE_CLIENT_EXPORT		= $(OPTEE_CLIENT_PATH)/out/export
 OPTEE_TEST_PATH			= $(ROOT)/optee_test
 OPTEE_TEST_OUT_PATH		= $(ROOT)/optee_test/out
-HELLOWORLD_PATH			= $(ROOT)/hello_world
 OPTEE_APP_PATH			= $(ROOT)/optee_app
 BENCHMARK_APP_PATH		= $(ROOT)/optee_benchmark
 LIBYAML_LIB_PATH		= $(BENCHMARK_APP_PATH)/libyaml/out/lib
@@ -25,7 +24,13 @@ LIBYAML_LIB_PATH		= $(BENCHMARK_APP_PATH)/libyaml/out/lib
 #HIKEY					= y
 
 # default high verbosity. slow uarts shall specify lower if prefered
+ifeq ($(DEBUG),1)
+CFG_TEE_CORE_LOG_LEVEL		= 3
+CFG_TEE_SUPP_LOG_LEVEL		= 3
+CFG_TEE_CLIENT_LOG_LEVEL	= 3
+else
 CFG_TEE_CORE_LOG_LEVEL		?= 2
+endif
 
 # default disable latency benchmarks (over all OP-TEE layers)
 CFG_TEE_BENCHMARK			?= n
@@ -191,6 +196,7 @@ endif
 
 .PHONY: linux-common
 linux-common: linux-defconfig
+	echo $(LINUX_COMMON_FLAGS)
 	$(MAKE) -C $(LINUX_PATH) $(LINUX_COMMON_FLAGS)
 
 $(LINUX_PATH)/.config: $(LINUX_DEFCONFIG_COMMON_FILES)
@@ -321,11 +327,13 @@ ifeq ($(CFG_TEE_BENCHMARK),y)
 optee-os-clean-common: benchmark-app-clean-common
 endif
 
-optee-os-clean-common: xtest-clean helloworld-clean optee-app-clean
+optee-os-clean-common: xtest-clean optee-app-clean
 	$(MAKE) -C $(OPTEE_OS_PATH) $(OPTEE_OS_CLEAN_COMMON_FLAGS) clean
 
 OPTEE_CLIENT_COMMON_FLAGS ?= CROSS_COMPILE=$(CROSS_COMPILE_NS_USER) \
 	CFG_TEE_BENCHMARK=$(CFG_TEE_BENCHMARK) \
+	CFG_TEE_CLIENT_LOG_LEVEL=$(CFG_TEE_CLIENT_LOG_LEVEL) \
+	CFG_TEE_SUPP_LOG_LEVEL=$(CFG_TEE_SUPP_LOG_LEVEL)
 
 .PHONY: optee-client-common
 optee-client-common:
@@ -400,7 +408,8 @@ OPTEE_APP_COMMON_FLAGS = HIKEY=y\
 	TA_DEV_KIT_DIR=$(OPTEE_OS_TA_DEV_KIT_DIR) \
 	TEEC_EXPORT=$(OPTEE_CLIENT_EXPORT) \
 	ARMCC=aarch64-linux-gnu-gcc \
-	CFG_TEE_TA_LOG_LEVEL=$(CFG_TEE_TA_LOG_LEVEL)
+	CFG_TEE_TA_LOG_LEVEL=$(CFG_TEE_TA_LOG_LEVEL) \
+	CFG_TA_GPROF_SUPPORT=$(CFG_TA_GPROF_SUPPORT)
 
 optee-app-common: optee-os optee-client
 	$(MAKE) -C $(OPTEE_APP_PATH) $(OPTEE_APP_COMMON_FLAGS)
@@ -450,7 +459,7 @@ filelist-tee-common: benchmark-app
 endif
 filelist-tee-common: fl:=$(GEN_ROOTFS_FILELIST)
 
-filelist-tee-common: optee-client xtest helloworld optee-app
+filelist-tee-common: optee-client xtest optee-app
 	@echo "# filelist-tee-common /start" 				> $(fl)
 	@echo "dir /lib/optee_armtz 755 0 0" 				>> $(fl)
 	@if [ -e $(OPTEE_EXAMPLES_PATH)/out/ca ]; then \
