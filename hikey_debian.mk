@@ -194,6 +194,9 @@ linux-cleaner: linux-cleaner-common
 ################################################################################
 # OP-TEE
 ################################################################################
+ifeq ($(DEBUG),1)
+	OPTEE_OS_COMMON_FLAGS += CFG_TEE_CORE_DEBUG=y
+endif
 OPTEE_OS_COMMON_FLAGS += PLATFORM=hikey \
 			 CFG_CONSOLE_UART=$(CFG_SW_CONSOLE_UART) \
 			 CFG_SECURE_DATA_PATH=n
@@ -391,7 +394,8 @@ deb: prepare xtest optee-app optee-client
 		cp -f $(OPTEE_APP_PATH)/host/capsule_breakdown . && \
 		cp -f $(OPTEE_APP_PATH)/host/capsule_test . && \
 		cp -f $(OPTEE_APP_PATH)/host/capsule_test_network . && \
-		cp -f $(OPTEE_APP_PATH)/host/capsule_test_policy .
+		cp -f $(OPTEE_APP_PATH)/host/capsule_test_policy . && \
+		cp -f $(OPTEE_APP_PATH)/test_app/test_app .
 ifeq ($(CFG_TEE_BENCHMARK),y)
 	@cd $(DEBPKG_BIN_PATH) && \
 		cp -f $(BENCHMARK_APP_PATH)/benchmark .
