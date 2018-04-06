@@ -64,6 +64,7 @@ MCUIMAGE_BIN		= $(OPENPLATPKG_PATH)/Platforms/Hisilicon/HiKey/Binary/mcuimage.bi
 BOOT_IMG			= $(OUT_PATH)/boot-fat.uefi.img
 NVME_IMG			= $(OUT_PATH)/nvme.img
 SYSTEM_IMG			= $(OUT_PATH)/debian_system.img
+SYSTEM_IMG_NAME		= debian_system.img
 WIFI_FW				= $(OUT_PATH)/firmware-ti-connectivity_20161130-3_all.deb
 GRUB_PATH			= $(ROOT)/grub
 GRUB_CONFIGFILE		= $(OUT_PATH)/grub.configfile
@@ -98,8 +99,8 @@ prepare:
 
 .PHONY: prepare-cleaner
 prepare-cleaner:
-	rm -rf $(ROOT)/out
 	rm -f ../linux-*
+#	rm -rf $(ROOT)/out
 
 ################################################################################
 # ARM Trusted Firmware
@@ -320,8 +321,9 @@ boot-img-clean:
 system-img: prepare
 ifeq ("$(wildcard $(SYSTEM_IMG))","")
 	@echo "Downloading Debian root fs ..."
-	wget $(SYSTEM_IMG_URL) -O $(SYSTEM_IMG).gz
-	gunzip $(SYSTEM_IMG).gz
+	cp ../../$(SYSTEM_IMG_NAME) $(SYSTEM_IMG)
+#	wget $(SYSTEM_IMG_URL) -O $(SYSTEM_IMG).gz
+#	gunzip $(SYSTEM_IMG).gz
 endif
 ifeq ("$(wildcard $(WIFI_FW))","")
 	@echo "Downloading Wi-Fi firmware package ..."
@@ -391,11 +393,13 @@ deb: prepare xtest optee-app optee-client
 	@mkdir -p $(DEBPKG_BIN_PATH) && cd $(DEBPKG_BIN_PATH) && \
 		cp -f $(OPTEE_CLIENT_EXPORT)/bin/tee-supplicant . && \
 		cp -f $(OPTEE_TEST_OUT_PATH)/xtest/xtest . && \
-		cp -f $(OPTEE_APP_PATH)/host/capsule_breakdown . && \
 		cp -f $(OPTEE_APP_PATH)/host/capsule_test . && \
-		cp -f $(OPTEE_APP_PATH)/host/capsule_test_network . && \
-		cp -f $(OPTEE_APP_PATH)/host/capsule_test_policy . && \
 		cp -f $(OPTEE_APP_PATH)/test_app/test_app .
+
+		#cp -f $(OPTEE_APP_PATH)/host/capsule_breakdown . &&
+		#cp -f $(OPTEE_APP_PATH)/host/capsule_test_network . &&
+		#cp -f $(OPTEE_APP_PATH)/host/capsule_test_policy . &&
+
 ifeq ($(CFG_TEE_BENCHMARK),y)
 	@cd $(DEBPKG_BIN_PATH) && \
 		cp -f $(BENCHMARK_APP_PATH)/benchmark .
@@ -411,8 +415,8 @@ endif
 
 	@mkdir -p $(DEBPKG_CAPSULE_PATH) && cd $(DEBPKG_CAPSULE_PATH)
 
-	@mkdir -p $(DEBPKG_CAPSULE_PATH)/other_capsules && cd $(DEBPKG_CAPSULE_PATH)/other_capsules && \
-		find $(OPTEE_APP_PATH)/capsule_gen/capsules/ -maxdepth 1 -type f -exec cp {} . \;
+	@mkdir -p $(DEBPKG_CAPSULE_PATH)/sample_capsules && cd $(DEBPKG_CAPSULE_PATH)/sample_capsules && \
+		cp -f $(OPTEE_APP_PATH)/capsule_gen/capsules/sample_capsules/* .
 	
 	@mkdir -p $(DEBPKG_CAPSULE_PATH)/test_capsules  && cd $(DEBPKG_CAPSULE_PATH)/test_capsules && \
 		cp -f $(OPTEE_APP_PATH)/capsule_gen/capsules/test_capsules/* .
