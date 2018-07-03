@@ -19,6 +19,7 @@ OPTEE_TEST_OUT_PATH		= $(ROOT)/optee_test/out
 OPTEE_APP_PATH			= $(ROOT)/optee_app
 BENCHMARK_APP_PATH		= $(ROOT)/optee_benchmark
 LIBYAML_LIB_PATH		= $(BENCHMARK_APP_PATH)/libyaml/out/lib
+FUSE_PATH				= $(ROOT)/libfuse
 
 # If building on Hikey
 #HIKEY					= y
@@ -28,6 +29,7 @@ ifeq ($(DEBUG),1)
 CFG_TEE_CORE_LOG_LEVEL		= 3
 CFG_TEE_SUPP_LOG_LEVEL		= 3
 CFG_TEE_CLIENT_LOG_LEVEL	= 3
+CFG_TEE_TA_LOG_LEVEL		= 4
 else
 CFG_TEE_CORE_LOG_LEVEL		?= 2
 endif
@@ -417,6 +419,15 @@ OPTEE_APP_CLEAN_COMMON_FLAGS ?= TA_DEV_KIT_DIR=$(OPTEE_OS_TA_DEV_KIT_DIR)
 
 optee-app-clean-common:
 	$(MAKE) -C $(OPTEE_APP_PATH) $(OPTEE_APP_CLEAN_COMMON_FLAGS) clean
+
+################################################################################
+# libfuse
+################################################################################
+libfuse: 
+	$(MAKE) -C $(FUSE_PATH)
+
+libfuse-clean:
+	$(MAKE) -C $(FUSE_PATH) clean
 
 ################################################################################
 # benchmark_app

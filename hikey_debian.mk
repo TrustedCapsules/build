@@ -86,7 +86,7 @@ all: arm-tf linux boot-img lloader system-img nvme deb
 
 clean: arm-tf-clean edk2-clean linux-clean optee-os-clean optee-client-clean \
 		xtest-clean boot-img-clean lloader-clean grub-clean \
-		optee-app-clean
+		optee-app-clean fuse-clean
 
 cleaner: clean prepare-cleaner linux-cleaner nvme-cleaner \
 			system-img-cleaner grub-cleaner
@@ -250,6 +250,13 @@ optee-app: optee-app-common
 optee-app-clean: optee-app-clean-common
 
 ################################################################################
+# libfuse
+################################################################################
+fuse: libfuse
+
+fuse-clean: libfuse-clean
+
+################################################################################
 # grub
 ################################################################################
 grub-flags := CC="$(CCACHE)gcc" \
@@ -382,14 +389,14 @@ ifeq ($(CFG_TEE_BENCHMARK),y)
 deb-clean: benchmark-app-clean
 endif
 
-deb-clean: xtest-clean optee-app-clean optee-client-clean
+deb-clean: xtest-clean optee-app-clean optee-client-clean fuse-clean
 
 .PHONY: deb
 ifeq ($(CFG_TEE_BENCHMARK),y)
 deb: benchmark-app
 endif
 
-deb: prepare xtest optee-app optee-client
+deb: prepare xtest optee-app optee-client fuse
 	@mkdir -p $(DEBPKG_BIN_PATH) && cd $(DEBPKG_BIN_PATH) && \
 		cp -f $(OPTEE_CLIENT_EXPORT)/bin/tee-supplicant . && \
 		cp -f $(OPTEE_TEST_OUT_PATH)/xtest/xtest . && \
@@ -417,6 +424,9 @@ endif
 
 	@mkdir -p $(DEBPKG_CAPSULE_PATH)/sample_capsules && cd $(DEBPKG_CAPSULE_PATH)/sample_capsules && \
 		cp -f $(OPTEE_APP_PATH)/capsule_gen/capsules/sample_capsules/* .
+	
+	@mkdir -p $(DEBPKG_ROOT_PATH)/libfuse && cd $(DEBPKG_ROOT_PATH)/libfuse && \
+		cp -rf $(FUSE_PATH)/* .
 	
 	@mkdir -p $(DEBPKG_CAPSULE_PATH)/test_capsules  && cd $(DEBPKG_CAPSULE_PATH)/test_capsules && \
 		cp -f $(OPTEE_APP_PATH)/capsule_gen/capsules/test_capsules/* .
