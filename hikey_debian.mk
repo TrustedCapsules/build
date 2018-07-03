@@ -391,6 +391,8 @@ deb-clean: benchmark-app-clean
 endif
 
 deb-clean: xtest-clean optee-app-clean optee-client-clean fuse-clean
+	@rm -rf $(DEBPKG_ROOT_PATH)/libfuse && \
+		rm -rf $(DEBPKG_FUSELIB_PATH)
 
 .PHONY: deb
 ifeq ($(CFG_TEE_BENCHMARK),y)
