@@ -78,6 +78,7 @@ DEBPKG_LIB_PATH		= $(DEBPKG_PATH)/usr/lib/$(MULTIARCH)
 DEBPKG_TA_PATH		= $(DEBPKG_PATH)/lib/optee_armtz
 DEBPKG_CAPSULE_PATH	= $(DEBPKG_PATH)/etc/
 DEBPKG_CONTROL_PATH	= $(DEBPKG_PATH)/DEBIAN
+DEBPKG_FUSELIB_PATH = $(DEBPKG_PATH)/lib/$(MULTIARCH)
 
 ################################################################################
 # Targets
@@ -427,6 +428,11 @@ endif
 	
 	@mkdir -p $(DEBPKG_ROOT_PATH)/libfuse && cd $(DEBPKG_ROOT_PATH)/libfuse && \
 		cp -rf $(FUSE_PATH)/* .
+
+	@mkdir -p $(DEBPKG_FUSELIB_PATH) && cd $(DEBPKG_FUSELIB_PATH) && \
+		cp -f $(FUSE_PATH)/build/lib/libfuse3.so.3.2.1 . && \
+		ln -s libfuse3.so.3.2.1 libfuse3.so.3 && \
+		ln -s libfuse3.so.3 libfuse3.so
 	
 	@mkdir -p $(DEBPKG_CAPSULE_PATH)/test_capsules  && cd $(DEBPKG_CAPSULE_PATH)/test_capsules && \
 		cp -f $(OPTEE_APP_PATH)/capsule_gen/capsules/test_capsules/* .
