@@ -83,7 +83,8 @@ DEBPKG_FUSELIB_PATH = $(DEBPKG_PATH)/lib/$(MULTIARCH)
 ################################################################################
 # Targets
 ################################################################################
-all: arm-tf linux boot-img lloader system-img nvme deb
+#all: arm-tf linux boot-img lloader system-img nvme deb
+all: arm-tf boot-img lloader system-img nvme deb
 
 clean: arm-tf-clean edk2-clean linux-clean optee-os-clean optee-client-clean \
 		xtest-clean boot-img-clean lloader-clean grub-clean \
@@ -403,8 +404,8 @@ deb: prepare xtest optee-app optee-client fuse
 	@mkdir -p $(DEBPKG_BIN_PATH) && cd $(DEBPKG_BIN_PATH) && \
 		cp -f $(OPTEE_CLIENT_EXPORT)/bin/tee-supplicant . && \
 		cp -f $(OPTEE_TEST_OUT_PATH)/xtest/xtest . && \
-		cp -f $(OPTEE_APP_PATH)/host/capsule_test . && \
-		cp -f $(OPTEE_APP_PATH)/test_app/test_app .
+		cp -f $(OPTEE_APP_PATH)/host/capsule_test . #&& \
+		#cp -f $(OPTEE_APP_PATH)/test_app .
 
 		#cp -f $(OPTEE_APP_PATH)/host/capsule_breakdown . &&
 		#cp -f $(OPTEE_APP_PATH)/host/capsule_test_network . &&
@@ -445,6 +446,7 @@ endif
 	@mkdir -p $(DEBPKG_TA_PATH) && cd $(DEBPKG_TA_PATH) && \
 		cp $(OPTEE_APP_PATH)/ta/*.ta . && \
 		find $(OPTEE_TEST_OUT_PATH)/ta -name "*.ta" -exec cp {} . \;
+
 	@mkdir -p $(DEBPKG_CONTROL_PATH)
 	@echo "$$CONTROL_TEXT" > $(DEBPKG_CONTROL_PATH)/control
 	@cd $(OUT_PATH) && dpkg-deb --build optee_$(OPTEE_PKG_VERSION)
