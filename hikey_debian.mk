@@ -437,12 +437,9 @@ endif
 		ln -s libfuse3.so.3.2.1 libfuse3.so.3 && \
 		ln -s libfuse3.so.3 libfuse3.so
 	
-	@mkdir -p $(DEBPKG_CAPSULE_PATH)/test_capsules  && cd $(DEBPKG_CAPSULE_PATH)/test_capsules && \
-		cp -f $(OPTEE_APP_PATH)/capsule_gen/capsules/test_capsules/* .
+	@mkdir -p $(DEBPKG_CAPSULE_PATH)/new_capsules && cd $(DEBPKG_CAPSULE_PATH)/new_capsules && \
+		cp -f $(OPTEE_APP_PATH)/capsule_gen/capsules/new_capsules/* . 
 	
-	@mkdir -p $(DEBPKG_CAPSULE_PATH)/use_case_capsules && cd $(DEBPKG_CAPSULE_PATH)/use_case_capsules && \
-		cp -f $(OPTEE_APP_PATH)/capsule_gen/capsules/use_case_capsules/* . 
-
 	@mkdir -p $(DEBPKG_TA_PATH) && cd $(DEBPKG_TA_PATH) && \
 		cp $(OPTEE_APP_PATH)/ta/*.ta . && \
 		find $(OPTEE_TEST_OUT_PATH)/ta -name "*.ta" -exec cp {} . \;
@@ -450,6 +447,7 @@ endif
 	@mkdir -p $(DEBPKG_CONTROL_PATH)
 	@echo "$$CONTROL_TEXT" > $(DEBPKG_CONTROL_PATH)/control
 	@cd $(OUT_PATH) && dpkg-deb --build optee_$(OPTEE_PKG_VERSION)
+
 
 ################################################################################
 # Send built files to the host, note this require that the IP corresponds to
