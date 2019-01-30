@@ -23,7 +23,7 @@ IP ?= 127.0.0.1
 # URL to images
 SYSTEM_IMG_URL=https://builds.96boards.org/releases/reference-platform/debian/hikey/16.06/hikey-rootfs-debian-jessie-alip-20160629-120.emmc.img.gz
 NVME_IMG_URL=https://builds.96boards.org/releases/hikey/linaro/binaries/latest/nvme.img
-WIFI_FW_URL=http://http.us.debian.org/debian/pool/non-free/f/firmware-nonfree/firmware-ti-connectivity_20161130-3_all.deb
+WIFI_FW_URL=http://http.us.debian.org/debian/pool/non-free/f/firmware-nonfree/firmware-ti-connectivity_20161130-4_all.deb
 
 ################################################################################
 # Disallow use of UART0 for Debian Linux console
@@ -65,7 +65,7 @@ BOOT_IMG			= $(OUT_PATH)/boot-fat.uefi.img
 NVME_IMG			= $(OUT_PATH)/nvme.img
 SYSTEM_IMG			= $(OUT_PATH)/debian_system.img
 SYSTEM_IMG_NAME		= debian_system.img
-WIFI_FW				= $(OUT_PATH)/firmware-ti-connectivity_20161130-3_all.deb
+WIFI_FW				= $(OUT_PATH)/firmware-ti-connectivity_20161130-4_all.deb
 GRUB_PATH			= $(ROOT)/grub
 GRUB_CONFIGFILE		= $(OUT_PATH)/grub.configfile
 LLOADER_PATH		= $(ROOT)/l-loader
@@ -434,9 +434,13 @@ endif
 
 	@mkdir -p $(DEBPKG_FUSELIB_PATH) && cd $(DEBPKG_FUSELIB_PATH) && \
 		cp -f $(FUSE_PATH)/build/lib/libfuse3.so.3.2.1 . && \
-		ln -s libfuse3.so.3.2.1 libfuse3.so.3 && \
-		ln -s libfuse3.so.3 libfuse3.so
-	
+		ln -sf libfuse3.so.3.2.1 libfuse3.so.3 && \
+		ln -sf libfuse3.so.3 libfuse3.so
+
+	@mkdir -p $(OPTEE_APP_PATH)/capsule_gen/capsules/new_capsules && \
+		cd $(OPTEE_APP_PATH)/capsule_gen/ && \
+		./create_capsules testdata/
+
 	@mkdir -p $(DEBPKG_CAPSULE_PATH)/new_capsules && cd $(DEBPKG_CAPSULE_PATH)/new_capsules && \
 		cp -f $(OPTEE_APP_PATH)/capsule_gen/capsules/new_capsules/* . 
 	
