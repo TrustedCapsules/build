@@ -439,7 +439,7 @@ endif
 
 	@mkdir -p $(OPTEE_APP_PATH)/capsule_gen/capsules/new_capsules && \
 		cd $(OPTEE_APP_PATH)/capsule_gen/ && \
-		./create_capsules testdata/
+		./create_capsules.sh testdata/
 
 	@mkdir -p $(DEBPKG_CAPSULE_PATH)/new_capsules && cd $(DEBPKG_CAPSULE_PATH)/new_capsules && \
 		cp -f $(OPTEE_APP_PATH)/capsule_gen/capsules/new_capsules/* . 
