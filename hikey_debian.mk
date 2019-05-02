@@ -17,13 +17,17 @@ CFG_SW_CONSOLE_UART ?= 3
 # eMMC flash size: 8 or 4 GB [default 8]
 CFG_FLASH_SIZE ?= 8
 
+# TZ RAM size: 16 or 64 MB [default 16]
+# In 64MB config HIKEY_TZRAM_64MB is defined
+CFG_TZRAM_SIZE ?= 16
+
 # IP-address to the HiKey device
 IP ?= 127.0.0.1
 
 # URL to images
 SYSTEM_IMG_URL=https://builds.96boards.org/releases/reference-platform/debian/hikey/16.06/hikey-rootfs-debian-jessie-alip-20160629-120.emmc.img.gz
 NVME_IMG_URL=https://builds.96boards.org/releases/hikey/linaro/binaries/latest/nvme.img
-WIFI_FW_URL=http://http.us.debian.org/debian/pool/non-free/f/firmware-nonfree/firmware-ti-connectivity_20161130-4_all.deb
+WIFI_FW_URL=http://http.us.debian.org/debian/pool/non-free/f/firmware-nonfree/firmware-ti-connectivity_20161130-5_all.deb
 
 ################################################################################
 # Disallow use of UART0 for Debian Linux console
@@ -83,8 +87,8 @@ DEBPKG_FUSELIB_PATH = $(DEBPKG_PATH)/lib/$(MULTIARCH)
 ################################################################################
 # Targets
 ################################################################################
-#all: arm-tf linux boot-img lloader system-img nvme deb
-all: arm-tf boot-img lloader system-img nvme deb
+all: arm-tf linux boot-img lloader system-img nvme deb
+#all: arm-tf boot-img lloader system-img nvme deb
 
 clean: arm-tf-clean edk2-clean linux-clean optee-os-clean optee-client-clean \
 		xtest-clean boot-img-clean lloader-clean grub-clean \
@@ -125,6 +129,10 @@ ifeq ($(ARM_TF_CONSOLE_UART),0)
 			CRASH_CONSOLE_BASE=PL011_UART0_BASE
 endif
 
+ifeq ($(CFG_TZRAM_SIZE),64)
+	ARM_TF_FLAGS += CFG_TZRAM_SIZE=$(CFG_TZRAM_SIZE)
+endif
+
 arm-tf: optee-os edk2
 	$(ARM_TF_EXPORTS) $(MAKE) -C $(ARM_TF_PATH) $(ARM_TF_FLAGS) all fip
 
@@ -142,6 +150,10 @@ EDK2_TOOLCHAIN ?= GCC49
 EDK2_CONSOLE_UART ?= $(CFG_NW_CONSOLE_UART)
 ifeq ($(EDK2_CONSOLE_UART),0)
 	EDK2_BUILDFLAGS += -DSERIAL_BASE=0xF8015000
+endif
+
+ifeq ($(CFG_TZRAM_SIZE),64)
+	EDK2_BUILDFLAGS += -DHIKEY_TZRAM_64MB
 endif
 
 define edk2-call
@@ -179,6 +191,10 @@ linux-defconfig: $(LINUX_PATH)/.config
 
 LINUX_COMMON_FLAGS += ARCH=arm64 deb-pkg LOCALVERSION=-optee-rpb HIKEY=y
 
+ifeq ($(CFG_TZRAM_SIZE),64)
+	LINUX_COMMON_FLAGS += CFG_TZRAM_SIZE=$(CFG_TZRAM_SIZE)
+endif
+
 linux: linux-common
 
 .PHONY: linux-defconfig-clean
@@ -204,6 +220,11 @@ OPTEE_OS_COMMON_FLAGS += PLATFORM=hikey \
 			 CFG_CONSOLE_UART=$(CFG_SW_CONSOLE_UART) \
 			 CFG_SECURE_DATA_PATH=n
 OPTEE_OS_CLEAN_COMMON_FLAGS += PLATFORM=hikey
+
+ifeq ($(CFG_TZRAM_SIZE),64)
+	OPTEE_OS_COMMON_FLAGS += CFG_TZRAM_SIZE=$(CFG_TZRAM_SIZE)
+endif
+
 
 optee-os: optee-os-common
 
